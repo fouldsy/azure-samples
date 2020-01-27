@@ -9,7 +9,7 @@
 # see https://github.com/fouldsy/azure-mol-samples/blob/master/LICENSE
 
 import string,random,time,azurerm,json,subprocess
-from azure.storage.queue import QueueService
+from azure.storage.queue import QueueClient
 
 # Define variables to handle Azure authentication
 get_token_cli = subprocess.Popen(['az account get-access-token | jq  -r .accessToken'], stdout=subprocess.PIPE, shell=True)
@@ -19,6 +19,7 @@ subscription_id = azurerm.get_subscription_from_cli()
 # Define variables with random resource group and storage account names
 resourcegroup_name = 'azuremol'+''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
 storageaccount_name = 'azuremol'+''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
+storageaccount_url = "https://"+storageaccount_name+".queue.core.windows.net/"
 location = 'eastus'
 
 ###
@@ -56,13 +57,12 @@ storageaccount_keys = json.loads(response.text)
 storageaccount_primarykey = storageaccount_keys['keys'][0]['value']
 
 # Create the Queue with the Azure Storage SDK and the access key obtained in the previous step
-queue_service = QueueService(account_name=storageaccount_name, account_key=storageaccount_primarykey)
-response = queue_service.create_queue('pizzaqueue')
+queue_service = QueueClient(account_url=storageaccount_url, queue_name='pizzaqueue', credential=storageaccount_primarykey)
+response = queue_service.create_queue()
 if response == True:
     print('Storage Queue: pizzaqueue created successfully.\n')
 else:
     print('Error creating Storage Queue.\n')
-
 
 ###
 # Use the Azure Storage Storage SDK for Python to drop some messages in our Queue
@@ -71,11 +71,11 @@ print('Now let\'s drop some messages in our Queue.\nThese messages could indicat
 raw_input('Press Enter to continue...')
 
 # This basic example creates a message for each pizza ordered. The message is *put* on the Queue.
-queue_service.put_message('pizzaqueue', u'Veggie pizza ordered.')
-queue_service.put_message('pizzaqueue', u'Pepperoni pizza ordered.')
-queue_service.put_message('pizzaqueue', u'Hawiian pizza ordered.')
-queue_service.put_message('pizzaqueue', u'Pepperoni pizza ordered.')
-queue_service.put_message('pizzaqueue', u'Pepperoni pizza ordered.')
+queue_service.send_message(u'Veggie pizza ordered.')
+queue_service.send_message(u'Pepperoni pizza ordered.')
+queue_service.send_message(u'Hawiian pizza ordered.')
+queue_service.send_message(u'Pepperoni pizza ordered.')
+queue_service.send_message(u'Pepperoni pizza ordered.')
 
 
 time.sleep(1)
@@ -87,7 +87,7 @@ time.sleep(1)
 print('\nLet\'s see how many orders we have to start cooking! Here, we simply examine how many messages are sitting the Queue. ')
 raw_input('Press Enter to continue...')
 
-metadata = queue_service.get_queue_metadata('pizzaqueue')
+metadata = queue_service.get_queue_properties()
 print('Number of messages in the queue: ' + str(metadata.approximate_message_count))
 
 
@@ -103,13 +103,13 @@ raw_input('Press Enter to continue...')
 # When you get each message, they become hidden from other parts of the applications being able to see it.
 # Once you have successfully processed the message, you then delete the message from the Queue.
 # This behavior makes sure that if something goes wrong in the processing of the message, it is then dropped back in the Queue for processing in the next cycle.
-messages = queue_service.get_messages('pizzaqueue')
+messages = queue_service.receive_messages()
 for message in messages:
     print('\n' + message.content)
-    queue_service.delete_message('pizzaqueue', message.id, message.pop_receipt)
+    queue_service.delete_message(message.id, message.pop_receipt)
 
 raw_input('\nPress Enter to continue...')
-metadata = queue_service.get_queue_metadata('pizzaqueue')
+metadata = queue_service.get_queue_properties()
 
 print('If we look at the Queue again, we have one less message to show we have processed that order and a yummy pizza will be on it\'s way to the customer soon.')
 print('Number of messages in the queue: ' + str(metadata.approximate_message_count))
@@ -123,7 +123,7 @@ raw_input('\nPress Enter to continue...')
 print('\nThis is a basic example of how Azure Storage Queues behave.\nTo keep things tidy, let\'s clean up the Azure Storage resources we created.')
 raw_input('Press Enter to continue...')
 
-response = queue_service.delete_queue('pizzaqueue')
+response = queue_service.delete_queue()
 if response == True:
     print('Storage Queue: pizzaqueue deleted successfully.')
 else:
