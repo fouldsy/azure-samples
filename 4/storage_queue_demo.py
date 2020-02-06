@@ -9,7 +9,7 @@
 # see https://github.com/fouldsy/azure-mol-samples/blob/master/LICENSE
 
 import string,random,time,azurerm,json,subprocess
-from azure.storage.queue import QueueService
+from azure.storage.queue import QueueServiceClient
 
 # Define variables to handle Azure authentication
 get_token_cli = subprocess.Popen(['az account get-access-token | jq  -r .accessToken'], stdout=subprocess.PIPE, shell=True)
@@ -56,7 +56,7 @@ storageaccount_keys = json.loads(response.text)
 storageaccount_primarykey = storageaccount_keys['keys'][0]['value']
 
 # Create the Queue with the Azure Storage SDK and the access key obtained in the previous step
-queue_service = QueueService(account_name=storageaccount_name, account_key=storageaccount_primarykey)
+queue_service = QueueServiceClient(account_name=storageaccount_name, account_key=storageaccount_primarykey)
 response = queue_service.create_queue('pizzaqueue')
 if response == True:
     print('Storage Queue: pizzaqueue created successfully.\n')
